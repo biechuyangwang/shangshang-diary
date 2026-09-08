@@ -49,33 +49,40 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:2.5rem}
 const WEEKS=['日','一','二','三','四','五','六'];
 const nav=document.getElementById('nav');
 const main=document.querySelector('main');
+const tip=document.getElementById('tip');
+let allPosts=[];
 const weekday=d=>{const[y,m,dd]=d.split('-').map(Number);return '周'+WEEKS[new Date(y,m-1,dd).getDay()]};
-fetch('posts.json').then(r=>r.json()).then(posts=>{
-  if(!posts.length){document.getElementById('tip').textContent='还没有日记';return}
-  posts.forEach(p=>{
-    const a=document.createElement('a');
-    a.href='#'+p;
-    a.textContent=p.slice(5)+' '+weekday(p);
-    nav.appendChild(a);
-  });
-  window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
-  show(location.hash.slice(1)||posts[0]);
-});
+const setTip=t=>{if(tip)tip.textContent=t};
+fetch('posts.json?v='+Date.now())
+  .then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+  .then(posts=>{
+    allPosts=posts;
+    if(!allPosts.length){setTip('还没有日记');return}
+    allPosts.forEach(p=>{
+      const a=document.createElement('a');
+      a.href='#'+p;
+      a.textContent=p.slice(5)+' '+weekday(p);
+      nav.appendChild(a);
+    });
+    window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+    show(location.hash.slice(1)||allPosts[0]);
+  })
+  .catch(()=>setTip('日记列表加载失败了，请刷新重试'));
 function show(p){
-  if(!posts.includes(p))p=posts[0];
+  if(!allPosts.length)return;
+  if(!allPosts.includes(p))p=allPosts[0];
   [...nav.children].forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+p));
   history.replaceState(null,'','#'+p);
   fetch('diary/'+p+'.md')
-    .then(r=>{if(!r.ok)throw 0;return r.text()})
+    .then(r=>{if(!r.ok)throw new Error(r.status);return r.text()})
     .then(t=>{
-      const tip=document.getElementById('tip');
       if(tip)tip.remove();
       let art=document.querySelector('article');
       if(!art){art=document.createElement('article');main.appendChild(art)}
-      art.innerHTML=marked.parse(t);
+      art.innerHTML=(typeof marked!=='undefined')?marked.parse(t):'<pre style="white-space:pre-wrap">'+t+'</pre>';
       window.scrollTo(0,0);
     })
-    .catch(()=>{document.getElementById('tip').textContent='这篇日记加载失败了';});
+    .catch(()=>setTip('这篇日记加载失败了'));
 }
 </script>
 </body>
